@@ -345,3 +345,15 @@ Then why do we even use websocket server ? why not just use pub sub ? <br>
 <br/><br/>
 ![publish and subscribe](image-9.png)
 <br/><br/>
+
+
+#### Interview Question
+### Stateless and Stateful Servers
+What are stateless server ? <br/>
+
+There are many http servers, they dont have inmemory object to store data they rely on databases to store data they are just authentication layer in the middle and if one goes down your client can connect to a different one this is called a stateless architecture. keep you architecture stateless since it is easy to scale this. there shouldn't be a constrain on user on connecting to a particular server only, you dont need to your connection to be sticky. Stateful servers are sticky so your http servers should always be sticky. But a Websocket server can't be stateless because websocket means a persistent connection here we iterate over users in that particular room they sought have to be sticky that means on same server(without pubsubs) to get the shared messages and also to keep a track of users a inmemory object if connection goes down they reconnect to same server. So to make websocket stateless we use pubsub or centralized space which can talk among websocket servers.another not so good approach will be any server when gets data it broadcast same to all the other servers.<br/>
+
+What if redis/kafka or centralized space goes down ? <br/>
+Then you can have resiliency so if one goes down you can connect to another one but it can be a signle point of failure if there is only one.<br/>
+
+Code to run redis: docker run -p 6379:6379 redis:latest
