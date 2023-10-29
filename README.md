@@ -357,3 +357,180 @@ What if redis/kafka or centralized space goes down ? <br/>
 Then you can have resiliency so if one goes down you can connect to another one but it can be a signle point of failure if there is only one.<br/>
 
 Code to run redis: docker run -p 6379:6379 redis:latest
+
+#### Interview Question
+## What is Redis ?
+
+Redis gives out of the box a lot of distributed things.it can handle a lot of load on common use cases in distributed systems. like 
+1. In-memory Storage
+2. Pub/Subs
+3. persistence
+4. Message Queues
+5. Cluster mode: multiple redis servers can talk to each other and also with resiliency. if one goes down other can take over.and distributs data among them. </br>
+   
+Goal is to get minimum latency instead of using a database.which takes time to read and write so redis provides it in-memory so read and writes are faster and also if redis goes down it tries best to recover data but there might be case where it gets stored in redis but didn't reach the file system and if we close it then data might get lost but most cases in production yes it  backups in file system and gurantees persistence.
+Redis is an open-source, in-memory data structure store that can be used as a database, cache, and message broker
+
+Usually used for caching data before the server for faster lookups.It is not used as a primary data source. it is used as a cache between the server and the database. If data is not present then we hit the database show it to client and store it in cache for future request. What is someone puts an update on database and redis cache has different value then? so whenever we insert into database first we remove it from the redis cache. So even though there might be different servers redis cache is only one. Sometime people do have individual cache for each server but then cache resets after sometime. redis can be used for advertisment.
+</br>
+</br>
+![redis requests flow](image-10.png)
+</br>
+</br>
+
+#### commands
+1. docker run -p 6379:6379 redis
+2. docker exec -it 3347db15f01e<containerId> /bin/bash
+3. redis-cli
+Redis by default gives you an client, you can have nodejs client and other client.
+4. SET USER_METADATA_1 Swaraj
+   USER_METADATA_1 is the key used for caching and Swaraj is the value. key is required by user to get their metadata.
+5. GET USER_METADATA_1   
+6. SET USER_METADATA_1 Swaraj EX 10
+   EX 10 means expire in 10 seconds.afetr 10 seconds it will be deleted from redis cache and will give null and hit the database again.
+
+</br>
+</br>
+
+![redis ssh](image-13.png)
+
+</br>
+</br>
+
+#### In a Nodejs Process
+
+```javascript
+import express from 'express';
+import { createClient } from "redis";
+
+const app = express();
+const PORT = 3000;
+
+const redisClient = createClient();
+redisClient.connect();
+{/*.. We can put await here ideally to connect and wait for it */}
+
+app.use(express.json());
+
+app.get('/uncached', async (req, res) => {
+    const data = await expensiveOperation();
+    res.json(data);
+});
+
+app.get('/cached', async (req, res) => {
+    const cachedData = await redisClient.get('data');
+    if (cachedData) {
+        return res.json(JSON.parse(cachedData));
+    }
+    const data = await expensiveOperation();
+    await redisClient.set('data', JSON.stringify(data));
+
+    res.json(data);
+});
+
+app.listen(PORT, () => {
+    console.log(`Server started on http://localhost:${PORT}`);
+});
+
+async function expensiveOperation() {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return {
+        username: "swaraj",
+        email: "swaraj@gmail.com"
+    }
+}
+
+```
+
+const redisClient = createClient(); in here we can pass options like global redis server if nothing then it takes
+localhost 6379
+
+It has both cached and uncached(everytiem going to database) enpoint, expensive operation would be a database call.
+
+#### In cached
+
+```javascript
+app.get('/cached', async (req, res) => {
+    const cachedData = await redisClient.get('data');
+    {/*.. if data is present in redis cache then return it 
+    along with that you hace to send a key like user_id or some indetifier */}
+    if (cachedData) {  // if cached data found
+        return res.json(JSON.parse(cachedData));
+    }
+    //else if cached data not found then hit the database
+    const data = await expensiveOperation();
+    // set the data in redis cache
+    await redisClient.set('data', JSON.stringify(data));
+    // send the data to the client
+    res.json(data);
+});
+```
+
+A key would be function of what inputs you are hitting the databse with.
+for example userr_id to get all data of that user.
+To check how many user joined between certain period of time then key would time period will be a part of cache key. else another request comes it will go to database.
+Key would be complex.So cached enpoint will be slow for the first time but after that it will be fast compared to uncached enpoint.
+</br></br>
+
+![uncached endpoint](image-12.png)
+
+It takes around 1.01 seconds to get the data from database.
+
+![cached enpoint](image-11.png)
+
+it took around 0.14 seconds to get the data from redis cache.
+</br>
+
+To check if there is data in redis
+
+#### command in CLI
+1. GET data
+127.0.0.1:6379> GET data
+"{\"username\":\"swaraj\",\"email\":\"swaraj@gmail.com\"}"
+
+#### Use Case:
+1. Leetcode during a contest gets a lot of load at the same time so there are not multiple servers running and if they do it will be very expensive, and spinning off a new instance takes time so they use something called as asynchronous processing, they put the submissions in a queue and sends to limited number of workers they in their own time pick a problem from the queue , figure out a solution and let the backend know it and pick another problem from the queue. so submission will be missed since it is in a queue and also wont't overwhlem the server untill then client till it doesn't get a response we can show a loading screen.
+
+2. Notifications sending Emails , here to we put million users in a queue and workers will send emails to them and keep on picking from the queue and send emails to them. it can retry sending emails if it fails. this is a persistent property of redis. so if a worker goes down it can pick up from where it left off. if we directly send emails from the server it will be slow and also if server goes down it will be lost event will be lost and we can't start where we left from and recover.
+
+#### Popular ways to do Queues
+1. RabbitMQ
+2. Redis
+
+Redis can be used for notifications. </br>
+Redis lets you push with following commands:
+</br></br>
+
+![Alt text](image-15.png)
+
+LPUSH 1: Left push into the queue </br>
+LPUSH 2: Left push into the queue </br>
+LPUSH 3: Left push into the queue </br>
+RPOP: Right pop from the queue (removes the last element from the queue) here it is 1
+
+Whenever you put LPUSH that is reverse order so to get the order you have to use RPOP. since it is a queue 
+if we do LPOP it will behave like a stack and will remove the first element. which we dont want. in real world number would be JSON objects.
+
+LPUSH problems_low_priority here key could be low_priority example that means let say user is a free user so we can send this to a queue which has 3 workers (that means a bit slow) or high_priority which has 10 workers (that means fast) so we can send this to a queue which has 10 workers. so we can have multiple queues for free or premium users (low latency for premium users and high latency for free users).
+
+So Nodejs processes has to PUSH and POP and process if they miss any or server goes down they push it to another server which is a backup_queue and checks backup_queue if there is any data and process it or is there any corrupt data that failed to process.
+
+#### Interview Question
+Javascript is single threaded so how can we do multiple things at the same time ? <br/>
+Yes javascript is single threaded but we can use multi cores using **<span style="background-color: darkblue;">Clusters</span>** module.
+If we buy a ec3 instance with multiple cores we want to it to use all the cores. but javascript is single threaded so what we can do is to use Clusters module.that means a single node js command can run multiple processes.
+through node js we can spawn a go process or a python process or a java process and communicate with it. so we can use multiple cores of a machine.
+and similarly when spawn a node js process that is we can distribute the load among multiple node js processes. so we can use all the cores of a machine.
+**<span style="background-color: darkblue;">Also It understands eventhough there are multiple cores all run on a single port so if someone hits a server and there are multiple processes running in a distributed fashion they will point to the same port or server or localhost for example</span>** . there is no port conflict unlike if we do normally. we get (port already in use). It takes it as a child process and parent routes it to same port hence we get multiple machines.
+
+cluster.isMaster is the first process that starts. we run a forloop to run number of cpus like count = os.cpus().length - 1;. cluster.fork to fork a new process. Master cluster is the parent the first process rest others are child processes. and master cluster runs spwan to spawn a new process. and we can communicate between master and child process.
+
+So on a 8 core machine there could be 20 processes using Interleaving in OS. that goes back and forth between processes. so if one process is blocked it goes to another process, just like that it runs multiple processes.
+
+#### Interview Question
+
+* ### Sharding
+![Alt text](image-16.png)
+
+In the above process scaling on the left side that is websocket servers, this can be done easily by increasing the number of websocket servers when load increases. but there is only one pub/sub so there is a chance it gets overwhelm in such a case we need to perform sharding. </br>
+We can create a fleet of pub/subs and it has it sets of websocket servers like 50 and half the load of people let say. sharding is basically cutting down and making independent parts that works on their own. in such a case if anything wrong happens only 50 users will get affected not all (lesser blast radius). Load on pub/subs is reduced. but this will work unless there is only a single room which has a lot of users because all of them has to go to a particular fleet and then that fleet pub/sub may get overwhlem and then blast radius.if there are not much user 10^5, 10^6 then sharding can be done.
