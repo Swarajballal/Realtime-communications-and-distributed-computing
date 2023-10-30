@@ -534,3 +534,15 @@ So on a 8 core machine there could be 20 processes using Interleaving in OS. tha
 
 In the above process scaling on the left side that is websocket servers, this can be done easily by increasing the number of websocket servers when load increases. but there is only one pub/sub so there is a chance it gets overwhelm in such a case we need to perform sharding. </br>
 We can create a fleet of pub/subs and it has it sets of websocket servers like 50 and half the load of people let say. sharding is basically cutting down and making independent parts that works on their own. in such a case if anything wrong happens only 50 users will get affected not all (lesser blast radius). Load on pub/subs is reduced. but this will work unless there is only a single room which has a lot of users because all of them has to go to a particular fleet and then that fleet pub/sub may get overwhlem and then blast radius.if there are not much user 10^5, 10^6 then sharding can be done.
+
+### Publishing and Subscribing in cli through redis
+![Alt text](image-18.png)
+</br></br>
+
+In the above messsage we are publishing to user_messages_room1 from one terminal and sending a message while in another terminal we are subscribing to user_messages_room1 and getting the message it is reading messages and waiting for a message to come. so this is how pub/sub works. we can add multiple subscribers and publisher as long as the room is same it will reached by all in that room.
+</br>
+
+![Alt text](image-17.png)
+</br>
+
+So there could be different web servers which are subscribing to the same room and they will get the message. so this is how pub/sub works.
