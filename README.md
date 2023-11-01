@@ -4,7 +4,7 @@
 
 #### Why WebSockets?
 
-1. Http is great, but doesn't cover a few usercases. <br>
+1. Http is great, but doesn't cover a few usecases. <br>
 2. The most important use case it doesn't cover is server side events. <br>
 3. What if you want to create a realtime application? like
    zerodha or Binance<br>
